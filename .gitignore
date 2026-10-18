@@ -1,0 +1,8 @@
+node_modules/
+.next/
+data/
+dist/
+*.tsbuildinfo
+*.log
+.env*
+TASK_SPEC.md

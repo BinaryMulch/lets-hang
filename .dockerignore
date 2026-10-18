@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+data
+*.tsbuildinfo
+*.log
+.env*
+TASK_SPEC.md
+docker-compose.yml
