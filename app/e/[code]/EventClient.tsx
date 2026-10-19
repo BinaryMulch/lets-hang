@@ -40,6 +40,7 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
   const [personalCopyLabel, setPersonalCopyLabel] = useState("Copy my link");
   const [forgetPending, setForgetPending] = useState(false);
   const [slotError, setSlotError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
   const inFlightRef = useRef(0);
   const identityRef = useRef<Identity | null>(null);
   const pendingDatesRef = useRef(new Set<string>());
@@ -124,15 +125,6 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
   useEffect(() => () => {
     if (forgetTimerRef.current !== null) window.clearTimeout(forgetTimerRef.current);
   }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible" && inFlightRef.current === 0) {
-        void refresh();
-      }
-    }, 5000);
-    return () => window.clearInterval(timer);
-  }, [refresh]);
 
   const participantId = identity?.participant_id ?? null;
   const ownParticipant = participants.find((participant) => participant.id === participantId);
@@ -274,6 +266,16 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
     }, 5000);
   }
 
+  async function manualRefresh() {
+    if (refreshing || inFlightRef.current > 0) return;
+    setRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   async function pickDate(date: string | null) {
     const response = await fetch(`/api/events/${code}/pick`, {
       method: "POST",
@@ -326,9 +328,14 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
         )}
       </header>
 
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Board views">
-        <button className={tab === "mine" ? BTN_PRIMARY : BTN_SECONDARY} onClick={() => setTab("mine")} role="tab" type="button">My availability</button>
-        <button className={tab === "results" ? BTN_PRIMARY : BTN_SECONDARY} onClick={() => setTab("results")} role="tab" type="button">Group results</button>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Board views">
+          <button className={tab === "mine" ? BTN_PRIMARY : BTN_SECONDARY} onClick={() => setTab("mine")} role="tab" type="button">My availability</button>
+          <button className={tab === "results" ? BTN_PRIMARY : BTN_SECONDARY} onClick={() => setTab("results")} role="tab" type="button">Group results</button>
+        </div>
+        <button className={BTN_SECONDARY} disabled={refreshing} onClick={() => void manualRefresh()} type="button">
+          {refreshing ? "Refreshing…" : "Refresh"}
+        </button>
       </div>
 
       {tab === "mine" ? (
