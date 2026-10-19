@@ -8,7 +8,7 @@ import { addDaysISO, todayISO } from "@/lib/dates";
 const CARD = "bg-white/70 backdrop-blur-md border border-white/70 shadow-sm rounded-2xl";
 const BTN_PRIMARY = "px-4 py-2 text-sm font-medium rounded-full bg-violet-600 text-white hover:bg-violet-700";
 const BTN_SECONDARY = "px-4 py-2 text-sm font-medium rounded-full bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100";
-const INPUT = "w-full rounded-xl border border-zinc-300 bg-white/80 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400";
+const INPUT = "w-full rounded-xl border border-zinc-300 bg-white/80 px-3 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-400";
 
 type SavedBoard = { code: string; title: string };
 type Identity = { participant_id: number; name: string; secret: string };
@@ -160,7 +160,7 @@ export default function HomePage() {
               value={name}
             />
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block space-y-1.5 text-sm font-medium">
               <span>Start date</span>
               <input className={INPUT} onChange={(event) => setStartDate(event.target.value)} required type="date" value={startDate} />

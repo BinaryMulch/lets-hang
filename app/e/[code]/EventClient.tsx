@@ -12,7 +12,7 @@ import ResultsBoard from "./ResultsBoard";
 const CARD = "bg-white/70 backdrop-blur-md border border-white/70 shadow-sm rounded-2xl";
 const BTN_PRIMARY = "px-4 py-2 text-sm font-medium rounded-full bg-violet-600 text-white hover:bg-violet-700";
 const BTN_SECONDARY = "px-4 py-2 text-sm font-medium rounded-full bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100";
-const INPUT = "w-full rounded-xl border border-zinc-300 bg-white/80 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400";
+const INPUT = "w-full rounded-xl border border-zinc-300 bg-white/80 px-3 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-violet-400";
 
 export type EventData = {
   code: string;
@@ -388,7 +388,7 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
         {event.picked_date && (
           <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 flex items-center gap-2 justify-between">
             <span className="font-medium">It&apos;s happening: {fmtDay(event.picked_date)}</span>
-            <button className="px-4 py-2 text-sm font-medium rounded-full hover:bg-emerald-100" onClick={() => void pickDate(null)} type="button">Undo</button>
+            <button className="px-4 py-2 text-sm font-medium rounded-full shrink-0 hover:bg-emerald-100" onClick={() => void pickDate(null)} type="button">Undo</button>
           </div>
         )}
       </header>
