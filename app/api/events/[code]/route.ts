@@ -26,6 +26,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ code: string }
   const participants = participantRows.map((participant) => ({
     id: participant.id,
     name: participant.name,
+    color: participant.color,
     slots: slotRows
       .filter((slot) => slot.participant_id === participant.id)
       .map((slot) => slot.date),

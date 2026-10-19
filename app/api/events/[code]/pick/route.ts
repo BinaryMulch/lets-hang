@@ -1,5 +1,6 @@
-import { getDb, type EventRow } from "@/lib/db";
+import { getDb, type EventRow, type ParticipantRow } from "@/lib/db";
 import { isValidISO } from "@/lib/dates";
+import { secretsMatch } from "@/lib/identity";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request, ctx: { params: Promise<{ code: string }> }) {
@@ -26,6 +27,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ code: string }
   }
   if (date !== null && (!isValidISO(date) || date < event.start_date || date > event.end_date)) {
     return NextResponse.json({ error: "Date is outside this event's range." }, { status: 400 });
+  }
+
+  const participants = db
+    .prepare("SELECT * FROM participants WHERE event_id = ?")
+    .all(event.id) as ParticipantRow[];
+  if (!participants.some((participant) => secretsMatch(participant.secret, body.secret))) {
+    return NextResponse.json({ error: "Your identity for this board doesn't match." }, { status: 401 });
   }
 
   db.prepare("UPDATE events SET picked_date = ? WHERE id = ?").run(date, event.id);

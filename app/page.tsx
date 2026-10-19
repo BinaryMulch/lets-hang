@@ -11,6 +11,7 @@ const BTN_SECONDARY = "px-4 py-2 text-sm font-medium rounded-full bg-white text-
 const INPUT = "w-full rounded-xl border border-zinc-300 bg-white/80 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400";
 
 type SavedBoard = { code: string; title: string };
+type Identity = { participant_id: number; name: string; secret: string };
 
 function saveBoard(board: SavedBoard) {
   const current = JSON.parse(localStorage.getItem("hang:boards") || "[]") as SavedBoard[];
@@ -63,9 +64,14 @@ export default function HomePage() {
       if (!response.ok) throw new Error(data.error || "Couldn't create the board.");
 
       const code = String(data.event.code).toLowerCase();
+      const identity: Identity = {
+        participant_id: Number(data.participant_id),
+        name: name.trim(),
+        secret: String(data.secret),
+      };
       localStorage.setItem(
         `hang:${code}`,
-        JSON.stringify({ participant_id: data.participant_id, name: name.trim() }),
+        JSON.stringify(identity),
       );
       saveBoard({ code, title: data.event.title });
       router.push(`/e/${code}`);

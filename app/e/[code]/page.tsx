@@ -45,6 +45,7 @@ export default async function EventPage({ params }: { params: Promise<{ code: st
   const participants: ParticipantData[] = participantRows.map((participant) => ({
     id: participant.id,
     name: participant.name,
+    color: participant.color,
     slots: slotRows.filter((slot) => slot.participant_id === participant.id).map((slot) => slot.date),
   }));
 

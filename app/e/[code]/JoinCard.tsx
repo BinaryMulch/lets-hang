@@ -7,11 +7,12 @@ const BTN_PRIMARY = "px-4 py-2 text-sm font-medium rounded-full bg-violet-600 te
 const INPUT = "w-full rounded-xl border border-zinc-300 bg-white/80 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400";
 
 type SavedBoard = { code: string; title: string };
+type Identity = { participant_id: number; name: string; secret: string };
 
 type JoinCardProps = {
   code: string;
   title: string;
-  onJoined: (participantId: number, name: string) => void;
+  onJoined: (identity: Identity, color: string) => void;
 };
 
 export default function JoinCard({ code, title, onJoined }: JoinCardProps) {
@@ -32,7 +33,11 @@ export default function JoinCard({ code, title, onJoined }: JoinCardProps) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Couldn't join the board.");
 
-      const identity = { participant_id: Number(data.participant_id), name: String(data.name) };
+      const identity: Identity = {
+        participant_id: Number(data.participant_id),
+        name: String(data.name),
+        secret: String(data.secret),
+      };
       localStorage.setItem(`hang:${code}`, JSON.stringify(identity));
       let boards: SavedBoard[] = [];
       try {
@@ -45,7 +50,7 @@ export default function JoinCard({ code, title, onJoined }: JoinCardProps) {
         "hang:boards",
         JSON.stringify([{ code, title }, ...boards.filter((board) => board.code !== code)]),
       );
-      onJoined(identity.participant_id, identity.name);
+      onJoined(identity, String(data.color));
     } catch (joinError) {
       setError(joinError instanceof Error ? joinError.message : "Couldn't join the board.");
       setJoining(false);
@@ -71,8 +76,8 @@ export default function JoinCard({ code, title, onJoined }: JoinCardProps) {
         <button className={BTN_PRIMARY} disabled={joining} type="submit">
           {joining ? "Joining…" : "Join board"}
         </button>
-        <p className="text-sm text-zinc-500">You&apos;ll be able to change your days anytime.</p>
       </div>
+      <p className="text-sm text-zinc-500">Joined before on another device? Open your personal link — otherwise use a new name.</p>
     </form>
   );
 }

@@ -30,6 +30,8 @@ export function getDb(): Database.Database {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
+        secret TEXT NOT NULL DEFAULT '',
+        color TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
 
@@ -45,6 +47,16 @@ export function getDb(): Database.Database {
 
       CREATE INDEX IF NOT EXISTS idx_slots_date ON slots(date);
     `);
+
+    // Identity upgrade migration: per-person edit secrets + avatar colors.
+    const participantCols = db.prepare("PRAGMA table_info(participants)").all() as { name: string }[];
+    if (!participantCols.find((c) => c.name === "secret")) {
+      db.exec("ALTER TABLE participants ADD COLUMN secret TEXT NOT NULL DEFAULT ''");
+    }
+    if (!participantCols.find((c) => c.name === "color")) {
+      db.exec("ALTER TABLE participants ADD COLUMN color TEXT NOT NULL DEFAULT ''");
+    }
+
     globalForDb.__hangDb = db;
   }
   return globalForDb.__hangDb;
@@ -64,6 +76,8 @@ export type ParticipantRow = {
   id: number;
   event_id: number;
   name: string;
+  secret: string; // per-person edit credential; NEVER sent to read endpoints
+  color: string; // avatar color key from lib/avatars.ts palette
   created_at: string;
 };
 

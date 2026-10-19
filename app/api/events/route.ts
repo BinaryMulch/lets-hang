@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
+import { pickColor } from "@/lib/avatars";
 import { getDb } from "@/lib/db";
 import { daysBetween, isValidISO } from "@/lib/dates";
+import { makeSecret } from "@/lib/identity";
 import { NextResponse } from "next/server";
 
 const CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
@@ -41,20 +43,21 @@ export async function POST(req: Request) {
   }
 
   const db = getDb();
-  const create = db.transaction((code: string) => {
+  const create = db.transaction((code: string, secret: string) => {
     const eventResult = db
       .prepare("INSERT INTO events (code, title, start_date, end_date) VALUES (?, ?, ?, ?)")
       .run(code, title, startDate, endDate);
     const participantResult = db
-      .prepare("INSERT INTO participants (event_id, name) VALUES (?, ?)")
-      .run(Number(eventResult.lastInsertRowid), name);
+      .prepare("INSERT INTO participants (event_id, name, secret, color) VALUES (?, ?, ?, ?)")
+      .run(Number(eventResult.lastInsertRowid), name, secret, pickColor(0));
     return Number(participantResult.lastInsertRowid);
   });
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = makeCode();
+    const secret = makeSecret();
     try {
-      const participantId = create(code);
+      const participantId = create(code, secret);
       return NextResponse.json({
         event: {
           code,
@@ -64,6 +67,7 @@ export async function POST(req: Request) {
           picked_date: null,
         },
         participant_id: participantId,
+        secret,
       });
     } catch (error) {
       const sqliteError = error as { code?: string };

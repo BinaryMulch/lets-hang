@@ -1,4 +1,6 @@
+import { pickColor } from "@/lib/avatars";
 import { getDb, type EventRow, type ParticipantRow } from "@/lib/db";
+import { makeSecret } from "@/lib/identity";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request, ctx: { params: Promise<{ code: string }> }) {
@@ -27,9 +29,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ code: string }
     .prepare("SELECT * FROM participants WHERE event_id = ? AND name = ? COLLATE NOCASE")
     .get(event.id, name) as ParticipantRow | undefined;
   if (existing) {
-    return NextResponse.json({ participant_id: existing.id, name: existing.name });
+    return NextResponse.json(
+      { error: "That name has already joined this board. Open your personal link from a device where you joined, or pick a different name." },
+      { status: 409 },
+    );
   }
 
-  const result = db.prepare("INSERT INTO participants (event_id, name) VALUES (?, ?)").run(event.id, name);
-  return NextResponse.json({ participant_id: Number(result.lastInsertRowid), name });
+  const participantCount = db
+    .prepare("SELECT COUNT(*) AS count FROM participants WHERE event_id = ?")
+    .get(event.id) as { count: number };
+  const secret = makeSecret();
+  const color = pickColor(participantCount.count);
+  const result = db
+    .prepare("INSERT INTO participants (event_id, name, secret, color) VALUES (?, ?, ?, ?)")
+    .run(event.id, name, secret, color);
+  return NextResponse.json({ participant_id: Number(result.lastInsertRowid), name, color, secret });
 }

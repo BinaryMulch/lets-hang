@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { dotClass } from "@/lib/avatars";
 import { daysInRange, fmtDay, monthGrids, parseISO } from "@/lib/dates";
 import type { EventData, ParticipantData } from "./EventClient";
 
@@ -105,7 +106,14 @@ export default function ResultsBoard({ event, participants, participantId, onPic
                       <p className="font-bold">{fmtDay(date)}</p>
                       <span className="rounded-full bg-zinc-100 px-2 py-1 text-xs text-zinc-600">{free.length} of {total} free</span>
                     </div>
-                    <p className="mt-1 truncate text-sm text-zinc-500">{free.map((participant) => participant.name).join(", ")}</p>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                      {free.map((participant) => (
+                        <span className="inline-flex items-center gap-1 text-sm text-zinc-500" key={participant.id}>
+                          <span className={`inline-block h-2 w-2 rounded-full ${dotClass(participant.color)}`} />
+                          <span>{participant.name}</span>
+                        </span>
+                      ))}
+                    </div>
                   </div>
                   {locked ? (
                     <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800">Locked</span>
@@ -127,6 +135,7 @@ export default function ResultsBoard({ event, participants, participantId, onPic
           {participants.map((participant) => (
             <div className="flex items-center justify-between gap-3 p-4" key={participant.id}>
               <div className="flex min-w-0 items-center gap-2">
+                <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${dotClass(participant.color)}`} />
                 <span className="truncate font-medium">{participant.name}</span>
                 {participant.id === participantId && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs text-violet-700">you</span>}
               </div>

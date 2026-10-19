@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { dotClass } from "@/lib/avatars";
 import { daysBetween, daysInRange, fmtDay, fmtRange } from "@/lib/dates";
 import Calendar from "./Calendar";
 import JoinCard from "./JoinCard";
@@ -20,7 +21,8 @@ export type EventData = {
   picked_date: string | null;
 };
 
-export type ParticipantData = { id: number; name: string; slots: string[] };
+export type ParticipantData = { id: number; name: string; color: string; slots: string[] };
+export type Identity = { participant_id: number; name: string; secret: string };
 
 type EventClientProps = {
   initialEvent: EventData;
@@ -31,14 +33,17 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
   const code = initialEvent.code.toLowerCase();
   const [event, setEvent] = useState(initialEvent);
   const [participants, setParticipants] = useState(initialParticipants);
-  const [participantId, setParticipantId] = useState<number | null>(null);
+  const [identity, setIdentity] = useState<Identity | null>(null);
   const [tab, setTab] = useState<"mine" | "results">("mine");
   const [shareUrl, setShareUrl] = useState("");
   const [copyLabel, setCopyLabel] = useState("Copy");
+  const [personalCopyLabel, setPersonalCopyLabel] = useState("Copy my link");
+  const [forgetPending, setForgetPending] = useState(false);
   const [slotError, setSlotError] = useState("");
   const inFlightRef = useRef(0);
-  const participantIdRef = useRef<number | null>(null);
+  const identityRef = useRef<Identity | null>(null);
   const pendingDatesRef = useRef(new Set<string>());
+  const forgetTimerRef = useRef<number | null>(null);
 
   const refresh = useCallback(async () => {
     if (inFlightRef.current > 0) return;
@@ -47,28 +52,78 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
     const data = (await response.json()) as { event: EventData; participants: ParticipantData[] };
     setEvent(data.event);
     setParticipants((current) => {
-      const ownId = participantIdRef.current;
+      const ownId = identityRef.current?.participant_id ?? null;
       const localOwn = ownId === null ? undefined : current.find((participant) => participant.id === ownId);
       return data.participants.map((participant) => participant.id === ownId && localOwn ? localOwn : participant);
     });
   }, [code]);
 
   useEffect(() => {
+    let cancelled = false;
     const timer = window.setTimeout(() => {
-      setShareUrl(`${window.location.origin}/e/${code}`);
-      try {
-        const saved = JSON.parse(localStorage.getItem(`hang:${code}`) || "null") as { participant_id?: unknown } | null;
-        if (saved && Number.isInteger(saved.participant_id)) {
-          const savedId = Number(saved.participant_id);
-          participantIdRef.current = savedId;
-          setParticipantId(savedId);
+      void (async () => {
+        const identityParam = new URLSearchParams(window.location.search).get("i");
+        const identityMatch = identityParam?.match(/^(\d+)\.([A-Za-z0-9_-]{40,})$/);
+        const verification = identityMatch
+          ? fetch(`/api/events/${code}/verify`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              participant_id: Number(identityMatch[1]),
+              secret: identityMatch[2],
+            }),
+          })
+          : null;
+        window.history.replaceState({}, "", window.location.pathname);
+
+        try {
+          if (verification && identityMatch) {
+            const response = await verification;
+            if (response.ok) {
+              const data = (await response.json()) as { participant_id: number; name: string; color: string };
+              const verifiedIdentity: Identity = {
+                participant_id: data.participant_id,
+                name: data.name,
+                secret: identityMatch[2],
+              };
+              localStorage.setItem(`hang:${code}`, JSON.stringify(verifiedIdentity));
+            }
+          }
+        } catch {
+          // A failed identity link is ignored; an existing saved identity may still be usable.
         }
-      } catch {
-        localStorage.removeItem(`hang:${code}`);
-      }
+
+        setShareUrl(`${window.location.origin}/e/${code}`);
+        try {
+          const saved = JSON.parse(localStorage.getItem(`hang:${code}`) || "null") as Partial<Identity> | null;
+          if (saved && !saved.secret) {
+            localStorage.removeItem(`hang:${code}`);
+            return;
+          }
+          if (
+            saved
+            && Number.isInteger(saved.participant_id)
+            && typeof saved.name === "string"
+            && typeof saved.secret === "string"
+          ) {
+            const savedIdentity = saved as Identity;
+            identityRef.current = savedIdentity;
+            if (!cancelled) setIdentity(savedIdentity);
+          }
+        } catch {
+          localStorage.removeItem(`hang:${code}`);
+        }
+      })();
     }, 0);
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [code]);
+
+  useEffect(() => () => {
+    if (forgetTimerRef.current !== null) window.clearTimeout(forgetTimerRef.current);
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -79,11 +134,12 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
     return () => window.clearInterval(timer);
   }, [refresh]);
 
+  const participantId = identity?.participant_id ?? null;
   const ownParticipant = participants.find((participant) => participant.id === participantId);
   const selected = new Set(ownParticipant?.slots || []);
 
   function replaceOwnSlots(update: (slots: Set<string>) => Set<string>) {
-    const ownId = participantIdRef.current;
+    const ownId = identityRef.current?.participant_id ?? null;
     if (ownId === null) return;
     setParticipants((current) => current.map((participant) => {
       if (participant.id !== ownId) return participant;
@@ -92,18 +148,27 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
   }
 
   async function postSlot(date: string, free: boolean) {
-    const ownId = participantIdRef.current;
-    if (ownId === null) throw new Error("Join this board first.");
+    const currentIdentity = identityRef.current;
+    if (!currentIdentity) throw new Error("Join this board first.");
     const response = await fetch(`/api/events/${code}/slots`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ participant_id: ownId, date, free }),
+      body: JSON.stringify({
+        participant_id: currentIdentity.participant_id,
+        date,
+        free,
+        secret: currentIdentity.secret,
+      }),
     });
-    if (!response.ok) throw new Error("Couldn't save availability.");
+    if (!response.ok) {
+      const error = new Error("Couldn't save availability.") as Error & { status?: number };
+      error.status = response.status;
+      throw error;
+    }
   }
 
   function toggleDate(date: string) {
-    if (participantIdRef.current === null || pendingDatesRef.current.has(date)) return;
+    if (!identityRef.current || pendingDatesRef.current.has(date)) return;
     const wasFree = selected.has(date);
     pendingDatesRef.current.add(date);
     inFlightRef.current += 1;
@@ -115,13 +180,18 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
     });
 
     void postSlot(date, !wasFree)
-      .catch(() => {
+      .catch((error: Error & { status?: number }) => {
         replaceOwnSlots((slots) => {
           if (wasFree) slots.add(date);
           else slots.delete(date);
           return slots;
         });
-        setSlotError("Couldn't save that day. Try again.");
+        if (error.status === 401) {
+          clearIdentity();
+          setSlotError("Your identity doesn't match this board anymore — rejoin with your personal link or a new name.");
+        } else {
+          setSlotError("Couldn't save that day. Try again.");
+        }
       })
       .finally(() => {
         pendingDatesRef.current.delete(date);
@@ -141,10 +211,18 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
     inFlightRef.current += 1;
     void (async () => {
       let failed = false;
+      let identityFailed = false;
       for (const date of changed) {
         try {
           await postSlot(date, free);
-        } catch {
+        } catch (error) {
+          if ((error as Error & { status?: number }).status === 401) {
+            replaceOwnSlots(() => previous);
+            clearIdentity();
+            setSlotError("Your identity doesn't match this board anymore — rejoin with your personal link or a new name.");
+            identityFailed = true;
+            break;
+          }
           failed = true;
           replaceOwnSlots((slots) => {
             if (previous.has(date)) slots.add(date);
@@ -153,31 +231,54 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
           });
         }
       }
-      if (failed) setSlotError("Some days couldn't be saved. Try again.");
+      if (failed && !identityFailed) setSlotError("Some days couldn't be saved. Try again.");
       inFlightRef.current -= 1;
     })();
   }
 
-  function joined(id: number, name: string) {
-    participantIdRef.current = id;
-    setParticipantId(id);
-    setParticipants((current) => current.some((participant) => participant.id === id)
+  function joined(joinedIdentity: Identity, color: string) {
+    identityRef.current = joinedIdentity;
+    setIdentity(joinedIdentity);
+    setParticipants((current) => current.some((participant) => participant.id === joinedIdentity.participant_id)
       ? current
-      : [...current, { id, name, slots: [] }].sort((a, b) => a.name.localeCompare(b.name)));
+      : [...current, {
+        id: joinedIdentity.participant_id,
+        name: joinedIdentity.name,
+        color,
+        slots: [],
+      }].sort((a, b) => a.name.localeCompare(b.name)));
     void refresh();
   }
 
   function clearIdentity() {
     localStorage.removeItem(`hang:${code}`);
-    participantIdRef.current = null;
-    setParticipantId(null);
+    identityRef.current = null;
+    setIdentity(null);
+    setSlotError("");
+    setForgetPending(false);
+    if (forgetTimerRef.current !== null) {
+      window.clearTimeout(forgetTimerRef.current);
+      forgetTimerRef.current = null;
+    }
+  }
+
+  function requestForgetIdentity() {
+    if (forgetPending) {
+      clearIdentity();
+      return;
+    }
+    setForgetPending(true);
+    forgetTimerRef.current = window.setTimeout(() => {
+      setForgetPending(false);
+      forgetTimerRef.current = null;
+    }, 5000);
   }
 
   async function pickDate(date: string | null) {
     const response = await fetch(`/api/events/${code}/pick`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ date }),
+      body: JSON.stringify({ date, secret: identityRef.current?.secret ?? "" }),
     });
     if (!response.ok) throw new Error("Couldn't update the date.");
     setEvent((current) => ({ ...current, picked_date: date }));
@@ -189,6 +290,17 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
       setCopyLabel("Copied!");
     } catch {
       setCopyLabel("Copy");
+    }
+  }
+
+  async function copyPersonalLink() {
+    if (!identity) return;
+    const personalLink = `${window.location.origin}/e/${code}?i=${identity.participant_id}.${identity.secret}`;
+    try {
+      await navigator.clipboard.writeText(personalLink);
+      setPersonalCopyLabel("Copied!");
+    } catch {
+      setPersonalCopyLabel("Copy my link");
     }
   }
 
@@ -221,19 +333,29 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
 
       {tab === "mine" ? (
         participantId === null || !ownParticipant ? (
-          <JoinCard code={code} onJoined={joined} title={event.title} />
+          <div className="space-y-4">
+            {slotError && <p className="text-sm text-red-600">{slotError}</p>}
+            <JoinCard code={code} onJoined={joined} title={event.title} />
+          </div>
         ) : (
           <section className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               {participants.map((participant) => participant.id === participantId ? (
-                <div className="flex items-center gap-2" key={participant.id}>
+                <div className="flex flex-wrap items-center gap-2" key={participant.id}>
                   <span className="px-4 py-2 text-sm font-medium rounded-full bg-violet-600 text-white">
+                    <span className={`inline-block h-2 w-2 rounded-full ${dotClass(participant.color)}`} />{" "}
                     {participant.name} <span className="text-xs text-violet-100">you</span>
                   </span>
-                  <button className="px-4 py-2 text-sm text-zinc-500 rounded-full hover:bg-zinc-100" onClick={clearIdentity} type="button">Not you?</button>
+                  <button className="px-4 py-2 text-sm text-zinc-500 rounded-full hover:bg-zinc-100" onClick={requestForgetIdentity} type="button">
+                    {forgetPending ? "Forget this identity?" : "Not you?"}
+                  </button>
+                  <button className={BTN_SECONDARY} onClick={() => void copyPersonalLink()} type="button">{personalCopyLabel}</button>
                 </div>
               ) : (
-                <span className={BTN_SECONDARY} key={participant.id}>{participant.name}</span>
+                <span className={`${BTN_SECONDARY} inline-flex items-center gap-1.5`} key={participant.id}>
+                  <span className={`inline-block h-2 w-2 rounded-full ${dotClass(participant.color)}`} />
+                  {participant.name}
+                </span>
               ))}
             </div>
             <div className="flex flex-wrap gap-2">
