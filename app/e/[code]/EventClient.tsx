@@ -365,6 +365,7 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
                 </span>
               ))}
             </div>
+            <p className="text-sm text-zinc-500">Editing identity lives on this device — <span className="font-medium text-zinc-600">Copy my link</span> carries it to another one.</p>
             <div className="flex flex-wrap gap-2">
               <button className={BTN_SECONDARY} onClick={() => setAllDays(true)} type="button">Fill all days</button>
               <button className={BTN_SECONDARY} onClick={() => setAllDays(false)} type="button">Clear all</button>
