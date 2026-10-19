@@ -336,24 +336,39 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
     setEvent((current) => ({ ...current, picked_date: date }));
   }
 
-  async function copyLinkAsBool() {
+  async function writeClipboard(text: string): Promise<boolean> {
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(text);
       return true;
+    } catch {
+      // Plain-HTTP LAN hosts (insecure contexts) have no async Clipboard API —
+      // fall back to a synthetic selection copy. Still requires a user gesture,
+      // which a click is.
+    }
+    try {
+      const helper = document.createElement("textarea");
+      helper.value = text;
+      helper.setAttribute("readonly", "");
+      helper.style.position = "fixed";
+      helper.style.opacity = "0";
+      document.body.appendChild(helper);
+      helper.select();
+      helper.setSelectionRange(0, text.length);
+      const ok = document.execCommand("copy");
+      document.body.removeChild(helper);
+      return ok;
     } catch {
       return false;
     }
   }
 
+  async function copyLinkAsBool() {
+    return writeClipboard(shareUrl);
+  }
+
   async function copyPersonalLink() {
     if (!identity) return false;
-    const personalLink = `${window.location.origin}/e/${code}?i=${identity.participant_id}.${identity.secret}`;
-    try {
-      await navigator.clipboard.writeText(personalLink);
-      return true;
-    } catch {
-      return false;
-    }
+    return writeClipboard(`${window.location.origin}/e/${code}?i=${identity.participant_id}.${identity.secret}`);
   }
 
   return (
@@ -368,7 +383,7 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
         </div>
         <div className="flex flex-wrap gap-2">
           <input aria-label="Share link" className={`${INPUT} min-w-0 flex-1`} readOnly value={shareUrl} />
-          <CopyFlash baseClassName={BTN_PRIMARY} copiedLabel="Copied!" label="Copy" perform={copyLinkAsBool} />
+          <CopyFlash activeClassName="active:bg-violet-400" baseClassName={BTN_PRIMARY} copiedLabel="Copied!" label="Copy" perform={copyLinkAsBool} />
         </div>
         {event.picked_date && (
           <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 flex items-center gap-2 justify-between">
@@ -406,7 +421,7 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
                   <button className="px-4 py-2 text-sm text-zinc-500 rounded-full hover:bg-zinc-100" onClick={requestForgetIdentity} type="button">
                     {forgetPending ? "Forget this identity?" : "Not you?"}
                   </button>
-                  <CopyFlash baseClassName={BTN_SECONDARY} copiedLabel="Copied!" label="Copy my link" perform={copyPersonalLink} />
+                  <CopyFlash activeClassName="active:bg-zinc-200" baseClassName={BTN_SECONDARY} copiedLabel="Copied!" label="Copy my link" perform={copyPersonalLink} />
                   <button className="px-4 py-2 text-sm text-zinc-500 rounded-full hover:bg-zinc-100" onClick={() => setLeaveConfirmOpen(true)} type="button">
                     Leave board
                   </button>
