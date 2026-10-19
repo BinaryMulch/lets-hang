@@ -1,8 +1,52 @@
+import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { getDb, type EventRow, type ParticipantRow, type SlotRow } from "@/lib/db";
+import { daysBetween, fmtRange } from "@/lib/dates";
 import EventClient, { type EventData, type ParticipantData } from "./EventClient";
 import NotFoundActions from "./NotFoundActions";
 
 const CARD = "bg-white/70 backdrop-blur-md border border-white/70 shadow-sm rounded-2xl";
+
+export async function generateMetadata({ params }: { params: Promise<{ code: string }> }): Promise<Metadata> {
+  const { code: rawCode } = await params;
+  const code = rawCode.toLowerCase();
+  const row = getDb().prepare("SELECT * FROM events WHERE code = ?").get(code) as EventRow | undefined;
+  const h = await headers();
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  const host = h.get("host") ?? "localhost:3000";
+  const base = `${proto}://${host}`;
+
+  if (!row) {
+    return {
+      metadataBase: new URL(base),
+      title: "Board not found — Let's Hang",
+      description: "Check the link, or head home to create a new board.",
+    };
+  }
+
+  const range = fmtRange(row.start_date, row.end_date);
+  const days = daysBetween(row.start_date, row.end_date);
+  const title = `${row.title} — Let's Hang`;
+  const description = `Happening sometime across ${range} (${days} days). Add your name, tap the days that work, and pick one where everyone's free.`;
+
+  return {
+    metadataBase: new URL(base),
+    title,
+    description,
+    openGraph: {
+      title,
+      description: `${row.title}: looking for a day everyone's free between ${range}. Tap your days — let's lock one in.`,
+      url: `${base}/e/${code}`,
+      siteName: "Let's Hang",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+  };
+}
 
 export default async function EventPage({ params }: { params: Promise<{ code: string }> }) {
   const { code: rawCode } = await params;
