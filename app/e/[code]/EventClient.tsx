@@ -39,6 +39,7 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
   const [shareUrl, setShareUrl] = useState("");
   const [forgetPending, setForgetPending] = useState(false);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [signInOpen, setSignInOpen] = useState(false);
   const [slotError, setSlotError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const inFlightRef = useRef(0);
@@ -134,6 +135,15 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [leaveConfirmOpen]);
+
+  useEffect(() => {
+    if (!signInOpen) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setSignInOpen(false);
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [signInOpen]);
 
   const participantId = identity?.participant_id ?? null;
   const ownParticipant = participants.find((participant) => participant.id === participantId);
@@ -422,7 +432,9 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
                   <button className="px-4 py-2 text-sm text-zinc-500 rounded-full hover:bg-zinc-100" onClick={requestForgetIdentity} type="button">
                     {forgetPending ? "Forget this identity?" : "Not you?"}
                   </button>
-                  <CopyFlash activeClassName="active:bg-zinc-200" baseClassName={BTN_SECONDARY} copiedLabel="Copied!" label="Copy my link" perform={copyPersonalLink} />
+                  <button className="px-4 py-2 text-sm text-zinc-500 rounded-full hover:bg-zinc-100" onClick={() => setSignInOpen(true)} type="button">
+                    Sign in from another device?
+                  </button>
                   <button className="px-4 py-2 text-sm text-zinc-500 rounded-full hover:bg-zinc-100" onClick={() => setLeaveConfirmOpen(true)} type="button">
                     Leave board
                   </button>
@@ -435,9 +447,7 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
               ))}
             </div>
             <p className="text-sm text-zinc-600 leading-relaxed max-w-prose">
-              Your editing access lives only in this browser — copy your personal link and open it on another device to edit this board there.
-              <br />
-              Anyone with that link edits as you, so treat it like a key.
+              Your editing access lives only in this browser — use the sign-in button next to your name to carry it to another device.
             </p>
             <div className="flex flex-wrap gap-2">
               <button className={BTN_SECONDARY} onClick={() => setAllDays(true)} type="button">Fill all days</button>
@@ -474,6 +484,37 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
               <button className="flex-1 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold px-4 py-2 rounded-full" onClick={() => void doLeave()} type="button">
                 Leave board
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {identity && signInOpen && (
+        <div
+          aria-label="Sign in from another device"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 backdrop-blur-sm p-4"
+          onClick={() => setSignInOpen(false)}
+          role="dialog"
+        >
+          <div className="bg-white border border-zinc-200 rounded-2xl shadow-lg max-w-sm w-full p-6 space-y-4" onClick={(event) => event.stopPropagation()}>
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-violet-500/10">
+              <svg aria-hidden="true" className="h-5 w-5 text-violet-500" fill="none" viewBox="0 0 24 24">
+                <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+              </svg>
+            </div>
+            <div className="text-center">
+              <h2 className="text-lg font-semibold text-zinc-900">Sign in from another device</h2>
+              <p className="mt-2 text-sm text-zinc-600">
+                Your access to this board lives only in this browser. Copy your personal sign-in link and open it on your phone, laptop, or any other device — you&apos;ll edit this board there as {identity?.name ?? "you"}.
+              </p>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm">
+              Treat it like a key — anyone who opens this link edits as {identity?.name ?? "you"}. Keep it to your own devices.
+            </div>
+            <div className="flex flex-wrap justify-center gap-3">
+              <CopyFlash activeClassName="active:bg-violet-400" baseClassName={BTN_PRIMARY} copiedLabel="Copied!" label="Copy personal sign-in link" perform={copyPersonalLink} />
+              <button className={BTN_SECONDARY} onClick={() => setSignInOpen(false)} type="button">Done</button>
             </div>
           </div>
         </div>

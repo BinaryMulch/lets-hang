@@ -30,7 +30,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ code: string }
     .get(event.id, name) as ParticipantRow | undefined;
   if (existing) {
     return NextResponse.json(
-      { error: "That name has already joined this board. Open your personal link from a device where you joined, or pick a different name." },
+      { error: "That name has already joined this board. Open your personal sign-in link from a device where you joined, or pick a different name." },
       { status: 409 },
     );
   }

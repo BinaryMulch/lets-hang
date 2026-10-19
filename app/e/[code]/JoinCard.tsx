@@ -77,7 +77,7 @@ export default function JoinCard({ code, title, onJoined }: JoinCardProps) {
           {joining ? "Joining…" : "Join board"}
         </button>
       </div>
-      <p className="text-sm text-zinc-500">Joined before on another device? Open your personal link — otherwise use a new name.</p>
+      <p className="mt-1 text-sm text-zinc-500">Joined before on another device? Open your personal sign-in link there — otherwise use a new name.</p>
     </form>
   );
 }
