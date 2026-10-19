@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { dotClass } from "@/lib/avatars";
 import { daysBetween, daysInRange, fmtDay, fmtRange } from "@/lib/dates";
 import Calendar from "./Calendar";
+import CopyFlash from "./CopyFlash";
 import JoinCard from "./JoinCard";
 import ResultsBoard from "./ResultsBoard";
 
@@ -36,8 +37,6 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [tab, setTab] = useState<"mine" | "results">("mine");
   const [shareUrl, setShareUrl] = useState("");
-  const [copyLabel, setCopyLabel] = useState("Copy");
-  const [personalCopyLabel, setPersonalCopyLabel] = useState("Copy my link");
   const [forgetPending, setForgetPending] = useState(false);
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [slotError, setSlotError] = useState("");
@@ -337,23 +336,23 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
     setEvent((current) => ({ ...current, picked_date: date }));
   }
 
-  async function copyLink() {
+  async function copyLinkAsBool() {
     try {
       await navigator.clipboard.writeText(shareUrl);
-      setCopyLabel("Copied!");
+      return true;
     } catch {
-      setCopyLabel("Copy");
+      return false;
     }
   }
 
   async function copyPersonalLink() {
-    if (!identity) return;
+    if (!identity) return false;
     const personalLink = `${window.location.origin}/e/${code}?i=${identity.participant_id}.${identity.secret}`;
     try {
       await navigator.clipboard.writeText(personalLink);
-      setPersonalCopyLabel("Copied!");
+      return true;
     } catch {
-      setPersonalCopyLabel("Copy my link");
+      return false;
     }
   }
 
@@ -369,7 +368,7 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
         </div>
         <div className="flex flex-wrap gap-2">
           <input aria-label="Share link" className={`${INPUT} min-w-0 flex-1`} readOnly value={shareUrl} />
-          <button className={BTN_PRIMARY} onClick={() => void copyLink()} type="button">{copyLabel}</button>
+          <CopyFlash baseClassName={BTN_PRIMARY} copiedLabel="Copied!" label="Copy" perform={copyLinkAsBool} />
         </div>
         {event.picked_date && (
           <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 flex items-center gap-2 justify-between">
@@ -407,7 +406,7 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
                   <button className="px-4 py-2 text-sm text-zinc-500 rounded-full hover:bg-zinc-100" onClick={requestForgetIdentity} type="button">
                     {forgetPending ? "Forget this identity?" : "Not you?"}
                   </button>
-                  <button className={BTN_SECONDARY} onClick={() => void copyPersonalLink()} type="button">{personalCopyLabel}</button>
+                  <CopyFlash baseClassName={BTN_SECONDARY} copiedLabel="Copied!" label="Copy my link" perform={copyPersonalLink} />
                   <button className="px-4 py-2 text-sm text-zinc-500 rounded-full hover:bg-zinc-100" onClick={() => setLeaveConfirmOpen(true)} type="button">
                     Leave board
                   </button>
@@ -419,7 +418,11 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
                 </span>
               ))}
             </div>
-            <p className="text-sm text-zinc-500">Editing identity lives on this device — <span className="font-medium text-zinc-600">Copy my link</span> carries it to another one.</p>
+            <p className="text-sm text-zinc-600 leading-relaxed max-w-prose">
+              Your editing access lives only in this browser — copy your personal link and open it on another device to edit this board there.
+              <br />
+              Anyone with that link edits as you, so treat it like a key.
+            </p>
             <div className="flex flex-wrap gap-2">
               <button className={BTN_SECONDARY} onClick={() => setAllDays(true)} type="button">Fill all days</button>
               <button className={BTN_SECONDARY} onClick={() => setAllDays(false)} type="button">Clear all</button>

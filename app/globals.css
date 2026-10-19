@@ -1,3 +1,10 @@
 @import "tailwindcss";
 
-/* Light glassmorphism theme helpers. No animations anywhere by design. */
+/* Click feedback: user-approved micro-animation — copy-confirmation pop ONLY.
+   House rule stands: no ambient/page/hover animations anywhere else. */
+@keyframes copy-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.94); }
+  100% { transform: scale(1); }
+}
+.copy-pop { animation: copy-pop 0.3s ease-out 1; }
