@@ -61,7 +61,7 @@ export default function JoinCard({ code, title, onJoined }: JoinCardProps) {
     <form className={`${CARD} p-5 space-y-4`} onSubmit={join}>
       <div>
         <h2 className="text-xl font-bold">Who are you?</h2>
-        <p className="mt-1 text-sm text-zinc-500">Add your name to mark the days that work.</p>
+        <p className="mt-1 text-sm text-zinc-500">Add your name, then tap every day that could work for you.</p>
       </div>
       <input
         className={INPUT}

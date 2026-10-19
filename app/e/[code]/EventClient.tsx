@@ -380,6 +380,7 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
           <p className="mt-1 text-sm text-zinc-500">
             {fmtRange(event.start_date, event.end_date)} · {daysBetween(event.start_date, event.end_date)} days
           </p>
+          <p className="mt-1 text-xs text-zinc-400">The hangout lands on one of these days — everyone marks which ones work for them.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <input aria-label="Share link" className={`${INPUT} min-w-0 flex-1`} readOnly value={shareUrl} />

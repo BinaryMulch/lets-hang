@@ -132,11 +132,24 @@ export default function HomePage() {
         <p className="text-zinc-600">Find a day when everyone&apos;s free.</p>
       </header>
 
+      <ol className="grid gap-3 sm:grid-cols-3">
+        {[
+          "Create a board for the hangout and set the window of possible dates.",
+          "Share the link — everyone adds their name and taps the days that work.",
+          "Days the whole group is free light up green; lock one and you're set.",
+        ].map((step, index) => (
+          <li className={`${CARD} flex items-start gap-3 p-4`} key={index}>
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-600 text-xs font-bold text-white">{index + 1}</span>
+            <p className="text-sm text-zinc-600">{step}</p>
+          </li>
+        ))}
+      </ol>
+
       <div className="grid gap-6 md:grid-cols-2">
         <form className={`${CARD} p-5 space-y-4`} onSubmit={createBoard}>
           <div>
             <h2 className="text-xl font-bold">Create a board</h2>
-            <p className="mt-1 text-sm text-zinc-500">Pick a date range and invite your friends.</p>
+            <p className="mt-1 text-sm text-zinc-500">Name the get-together, set the window of possible dates, invite your friends.</p>
           </div>
           <label className="block space-y-1.5 text-sm font-medium">
             <span>Title</span>
@@ -170,6 +183,7 @@ export default function HomePage() {
               <input className={INPUT} onChange={(event) => setEndDate(event.target.value)} required type="date" value={endDate} />
             </label>
           </div>
+          <p className="text-xs text-zinc-500">The hangout happens on ONE day inside this range — set the earliest and latest day it could realistically happen.</p>
           <div className="flex flex-wrap gap-2" aria-label="Quick date ranges">
             {[7, 14, 30].map((days) => (
               <button className={BTN_SECONDARY} key={days} onClick={() => setQuickRange(days)} type="button">
