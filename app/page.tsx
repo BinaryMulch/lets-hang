@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { addDaysISO, todayISO } from "@/lib/dates";
 
 const CARD = "bg-white/70 backdrop-blur-md border border-white/70 shadow-sm rounded-2xl";
@@ -31,6 +31,8 @@ export default function HomePage() {
   const [joinValue, setJoinValue] = useState("");
   const [joinError, setJoinError] = useState("");
   const [boards, setBoards] = useState<SavedBoard[] | null>(null);
+  const [pendingRemoveCode, setPendingRemoveCode] = useState<string | null>(null);
+  const removeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -42,6 +44,10 @@ export default function HomePage() {
       }
     }, 0);
     return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => () => {
+    if (removeTimerRef.current !== null) window.clearTimeout(removeTimerRef.current);
   }, []);
 
   function setQuickRange(days: number) {
@@ -93,6 +99,28 @@ export default function HomePage() {
     }
     setJoinError("");
     router.push(`/e/${code}`);
+  }
+
+  function requestRemoveBoard(code: string) {
+    if (pendingRemoveCode === code) {
+      if (removeTimerRef.current !== null) {
+        window.clearTimeout(removeTimerRef.current);
+        removeTimerRef.current = null;
+      }
+      const next = (boards || []).filter((board) => board.code !== code);
+      localStorage.setItem("hang:boards", JSON.stringify(next));
+      localStorage.removeItem(`hang:${code}`);
+      setBoards(next);
+      setPendingRemoveCode(null);
+      return;
+    }
+
+    if (removeTimerRef.current !== null) window.clearTimeout(removeTimerRef.current);
+    setPendingRemoveCode(code);
+    removeTimerRef.current = window.setTimeout(() => {
+      setPendingRemoveCode(null);
+      removeTimerRef.current = null;
+    }, 5000);
   }
 
   return (
@@ -179,12 +207,21 @@ export default function HomePage() {
           <h2 className="text-xl font-bold">Your boards</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {boards.map((board) => (
-              <article className={`${CARD} p-4 flex items-center justify-between gap-3`} key={board.code}>
-                <div className="min-w-0">
+              <article className={`${CARD} p-4 flex flex-wrap items-center justify-between gap-3`} key={board.code}>
+                <div className="min-w-0 flex-1">
                   <h3 className="truncate font-semibold">{board.title}</h3>
                   <code className="mt-1 inline-block rounded-md bg-zinc-100 px-2 py-1 text-xs text-zinc-500">/e/{board.code}</code>
                 </div>
-                <Link className={BTN_SECONDARY} href={`/e/${board.code}`}>Open</Link>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link className={BTN_SECONDARY} href={`/e/${board.code}`}>Open</Link>
+                  <button
+                    className={`px-2 py-2 text-sm rounded-full hover:bg-zinc-100 ${pendingRemoveCode === board.code ? "text-red-600" : "text-zinc-400 hover:text-red-600"}`}
+                    onClick={() => requestRemoveBoard(board.code)}
+                    type="button"
+                  >
+                    {pendingRemoveCode === board.code ? "Remove?" : "Remove"}
+                  </button>
+                </div>
               </article>
             ))}
           </div>

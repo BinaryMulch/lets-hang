@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { getDb, type EventRow, type ParticipantRow, type SlotRow } from "@/lib/db";
 import EventClient, { type EventData, type ParticipantData } from "./EventClient";
+import NotFoundActions from "./NotFoundActions";
 
 const CARD = "bg-white/70 backdrop-blur-md border border-white/70 shadow-sm rounded-2xl";
-const BTN_SECONDARY = "px-4 py-2 text-sm font-medium rounded-full bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100";
 
 export default async function EventPage({ params }: { params: Promise<{ code: string }> }) {
   const { code: rawCode } = await params;
@@ -17,7 +16,7 @@ export default async function EventPage({ params }: { params: Promise<{ code: st
         <section className={`${CARD} p-6 space-y-4`}>
           <h1 className="text-2xl font-bold">This board doesn&apos;t exist.</h1>
           <p className="text-zinc-600">Check the link, or head home to create a new board.</p>
-          <Link className={`inline-block ${BTN_SECONDARY}`} href="/">← Home</Link>
+          <NotFoundActions code={code} />
         </section>
       </main>
     );

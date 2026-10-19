@@ -39,6 +39,7 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
   const [copyLabel, setCopyLabel] = useState("Copy");
   const [personalCopyLabel, setPersonalCopyLabel] = useState("Copy my link");
   const [forgetPending, setForgetPending] = useState(false);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   const [slotError, setSlotError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const inFlightRef = useRef(0);
@@ -125,6 +126,15 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
   useEffect(() => () => {
     if (forgetTimerRef.current !== null) window.clearTimeout(forgetTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    if (!leaveConfirmOpen) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setLeaveConfirmOpen(false);
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [leaveConfirmOpen]);
 
   const participantId = identity?.participant_id ?? null;
   const ownParticipant = participants.find((participant) => participant.id === participantId);
@@ -266,6 +276,47 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
     }, 5000);
   }
 
+  async function doLeave() {
+    const currentIdentity = identityRef.current;
+    if (!currentIdentity) {
+      setLeaveConfirmOpen(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/events/${code}/leave`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          participant_id: currentIdentity.participant_id,
+          secret: currentIdentity.secret,
+        }),
+      });
+      if (!response.ok) throw new Error("Couldn't leave the board.");
+
+      localStorage.removeItem(`hang:${code}`);
+      try {
+        const saved = JSON.parse(localStorage.getItem("hang:boards") || "[]") as { code: string; title: string }[];
+        const seen = new Set<string>();
+        const next = Array.isArray(saved) ? saved.filter((board) => {
+          if (!board || typeof board.code !== "string") return false;
+          const boardCode = board.code.toLowerCase();
+          if (boardCode === code || seen.has(boardCode)) return false;
+          seen.add(boardCode);
+          return true;
+        }) : [];
+        localStorage.setItem("hang:boards", JSON.stringify(next));
+      } catch {
+        localStorage.setItem("hang:boards", "[]");
+      }
+      clearIdentity();
+      setLeaveConfirmOpen(false);
+    } catch {
+      setLeaveConfirmOpen(false);
+      setSlotError("Couldn't leave the board. Try again.");
+    }
+  }
+
   async function manualRefresh() {
     if (refreshing || inFlightRef.current > 0) return;
     setRefreshing(true);
@@ -357,6 +408,9 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
                     {forgetPending ? "Forget this identity?" : "Not you?"}
                   </button>
                   <button className={BTN_SECONDARY} onClick={() => void copyPersonalLink()} type="button">{personalCopyLabel}</button>
+                  <button className="px-4 py-2 text-sm text-zinc-500 rounded-full hover:bg-zinc-100" onClick={() => setLeaveConfirmOpen(true)} type="button">
+                    Leave board
+                  </button>
                 </div>
               ) : (
                 <span className={`${BTN_SECONDARY} inline-flex items-center gap-1.5`} key={participant.id}>
@@ -376,6 +430,34 @@ export default function EventClient({ initialEvent, initialParticipants }: Event
         )
       ) : (
         <ResultsBoard event={event} onPick={(date) => pickDate(date)} participantId={participantId} participants={participants} />
+      )}
+
+      {identity && leaveConfirmOpen && (
+        <div
+          aria-label="Leave board confirmation"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 backdrop-blur-sm p-4"
+          onClick={() => setLeaveConfirmOpen(false)}
+          role="dialog"
+        >
+          <div className="bg-white border border-zinc-200 rounded-2xl shadow-lg max-w-sm w-full p-6 text-center" onClick={(event) => event.stopPropagation()}>
+            <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10">
+              <svg aria-hidden="true" className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24">
+                <path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-semibold text-zinc-900">Leave &quot;{event.title}&quot;?</h2>
+            <p className="mt-2 text-sm text-zinc-600 mb-6">
+              Your marked days will be removed from this board and your name becomes available again to others. You can always rejoin later and start fresh.
+            </p>
+            <div className="flex gap-3">
+              <button className={`flex-1 ${BTN_SECONDARY}`} onClick={() => setLeaveConfirmOpen(false)} type="button">Cancel</button>
+              <button className="flex-1 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold px-4 py-2 rounded-full" onClick={() => void doLeave()} type="button">
+                Leave board
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
